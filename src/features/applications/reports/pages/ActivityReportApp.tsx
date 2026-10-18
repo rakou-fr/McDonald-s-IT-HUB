@@ -3,6 +3,9 @@ import {
   FileText, Wand2, RotateCcw, FileDown, Printer, Plus, Trash2, 
   Upload, CheckCircle, Save, User, Camera, AlertTriangle, X, CheckCircle2
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 
 export interface Task {
   id: string;
@@ -171,7 +174,7 @@ export function ActivityReportApp() {
     }));
   };
 
-  // --- EXPORTATION PDF CORRIGÉE ---
+// --- EXPORTATION PDF ADAPTÉE ANDROID & WEB ---
   const exportToPDF = async () => {
     showToast("Génération du PDF en cours...");
     const element = previewRef.current;
@@ -181,9 +184,8 @@ export function ActivityReportApp() {
     const cleanDate = reportData.reportDate || new Date().toISOString().split('T')[0];
     const fileName = `Rapport_${cleanDate}_${cleanName}.pdf`;
 
-    // Configuration optimale pour éliminer les décalages
     const opt = {
-      margin: 0, // Pas de marge globale car le padding est géré dans .a4-page
+      margin: 0,
       filename: fileName,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
@@ -196,17 +198,50 @@ export function ActivityReportApp() {
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
-    if ((window as any).html2pdf) {
-      try {
-        await (window as any).html2pdf().set(opt).from(element).save();
+    const generatePdf = async () => {
+      const worker = (window as any).html2pdf().set(opt).from(element);
+
+      // CAS 1 : Application Native Android (APK)
+      if (Capacitor.isNativePlatform()) {
+        try {
+          // 1. Générer le PDF au format Base64
+          const pdfDataUri = await worker.outputPdf('datauristring');
+          const base64Data = pdfDataUri.split(',')[1];
+
+          // 2. Écrire le fichier dans le stockage temporaire/cache du téléphone
+          const savedFile = await Filesystem.writeFile({
+            path: fileName,
+            data: base64Data,
+            directory: Directory.Cache
+          });
+
+          showToast("PDF prêt ! Ouverture du menu...");
+
+          // 3. Ouvrir la feuille de partage/sauvegarde native Android
+          await Share.share({
+            title: 'Rapport d\'Activité IT',
+            text: `Rapport d'intervention ${cleanDate}`,
+            url: savedFile.uri,
+            dialogTitle: 'Enregistrer ou envoyer le PDF'
+          });
+        } catch (err) {
+          console.error("Erreur d'export Android :", err);
+          showToast("Erreur lors de la sauvegarde sur mobile.");
+        }
+      } 
+      // CAS 2 : Navigateur Web classique (PC / Mac)
+      else {
+        await worker.save();
         showToast("PDF téléchargé avec succès !");
-      } catch (err) {
-        window.print();
       }
+    };
+
+    if ((window as any).html2pdf) {
+      await generatePdf();
     } else {
       const script = document.createElement('script');
       script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-      script.onload = () => exportToPDF();
+      script.onload = () => generatePdf();
       script.onerror = () => window.print();
       document.body.appendChild(script);
     }

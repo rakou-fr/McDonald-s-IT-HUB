@@ -10,7 +10,7 @@ import {
 } from '../services/githubService';
 import { 
   Search, Plus, Save, Loader2, AlertCircle, RefreshCw, Box, 
-  AlertTriangle, CheckCircle, Edit, Trash2, FolderPlus, Building2, Globe
+  AlertTriangle, CheckCircle, Edit, Trash2, FolderPlus, Building2
 } from 'lucide-react';
 
 export function StockItApp() {
@@ -267,7 +267,7 @@ export function StockItApp() {
                 <FolderPlus size={14} /> + Catégorie
               </button>
               <button onClick={openNewItemModal} className="px-3 py-2 bg-mcd-green hover:bg-[#005135] text-white font-semibold text-xs border border-[#00402a] flex items-center gap-1.5 rounded-sm">
-                <Plus size={14} /> + Article
+                <Plus size={14} /> Article
               </button>
             </>
           )}
