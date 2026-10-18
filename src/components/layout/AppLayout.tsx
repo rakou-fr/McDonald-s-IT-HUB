@@ -3,7 +3,7 @@ import { Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { LogOut, Home, User as UserIcon, Menu, X, Tag } from 'lucide-react';
 import { BrandLogo } from '../branding/BrandLogo';
 import { logoutUser, getCurrentUser } from '../../features/auth/services/authService';
-import packageJson from '../../package.json';
+import packageJson from '../../../package.json';
 import { Capacitor } from '@capacitor/core';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 
