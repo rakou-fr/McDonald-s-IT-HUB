@@ -1,14 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, Navigate, useNavigate } from 'react-router-dom';
-import { LogOut, Home, User as UserIcon, Menu, X } from 'lucide-react';
+import { LogOut, Home, User as UserIcon, Menu, X, Tag } from 'lucide-react';
 import { BrandLogo } from '../branding/BrandLogo';
 import { logoutUser, getCurrentUser } from '../../features/auth/services/authService';
+import packageJson from '../../package.json';
+import { Capacitor } from '@capacitor/core';
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
 
 export function AppLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [appVersion, setAppVersion] = useState<string>(`v${packageJson.version}`);
   const navigate = useNavigate();
   const currentUser = getCurrentUser();
   
+  // Vérifie si la version OTA active sur le téléphone est différente
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      CapacitorUpdater.current()
+        .then((info) => {
+          if (info.bundle?.version) {
+            setAppVersion(info.bundle.version);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
   // Vérifie si un token de session existe bien
   const isAuthenticated = Boolean(localStorage.getItem('auth_token'));
 
@@ -27,7 +44,7 @@ export function AppLayout() {
       <header className="bg-mcd-green text-white shadow-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           
-          {/* Logo & Titre */}
+          {/* Logo, Titre & Badge de Version */}
           <div 
             onClick={() => { navigate('/'); setIsMobileMenuOpen(false); }} 
             className="flex items-center gap-3 cursor-pointer select-none"
@@ -37,6 +54,11 @@ export function AppLayout() {
               <span className="font-bold tracking-wide">McDonald's</span>
               <span className="bg-mcd-yellow text-mcd-text text-xs px-2 py-0.5 rounded font-semibold uppercase">
                 IT Hub
+              </span>
+              
+              {/* Badge Version */}
+              <span className="text-[10px] bg-white/15 text-green-100 font-mono px-1.5 py-0.5 rounded font-medium border border-white/10">
+                {appVersion}
               </span>
             </div>
           </div>
@@ -98,6 +120,12 @@ export function AppLayout() {
                 <span>Connecté : <strong className="text-white font-bold">{currentUser.username}</strong></span>
               </div>
             )}
+
+            {/* Indication de version dans le menu mobile */}
+            <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-white/60">
+              <Tag size={14} />
+              <span>Version de l'application : <strong className="text-white font-mono">{appVersion}</strong></span>
+            </div>
 
             <button
               onClick={() => {
