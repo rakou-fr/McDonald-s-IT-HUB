@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "updated_at": "2026-10-16T00:39:38.049152+00:00",
+  "users": [
+    {
+      "id": "usr_a6c4ea2f",
+      "username": "admin",
+      "password_hash": "pbkdf2:sha256:600000$UdN3lxQ5NF4bUp/31E0SWw==$j1lnMlUu0H6vN5aV47CfXL7D9JjArDQlEZJDaIHoSvU=",
+      "role": "admin",
+      "active": true
+    }
+  ]
+}
