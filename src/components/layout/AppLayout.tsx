@@ -90,7 +90,7 @@ export function AppLayout() {
             </button>
           </nav>
 
-          {/* Bouton Hamburger Mobile (Visible uniquement sur mobile) */}
+          {/* Bouton Hamburger Mobile (Visible sur mobile) */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="md:hidden p-1.5 text-white hover:bg-white/10 rounded transition-colors focus:outline-none"
