@@ -11,7 +11,7 @@ import {
   X,
   CheckCircle2
 } from 'lucide-react';
-import type { WikiData, Tutorial, Equipment, TargetRole } from '../types/wiki';
+import type { WikiData, Tutorial, TargetRole } from '../types/wiki';
 import { fetchWikiData } from '../services/wikiService';
 
 export function WikiApp() {

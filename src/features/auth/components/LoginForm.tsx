@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
 import { BrandLogo } from '../../../components/branding/BrandLogo';
 import { loginUser } from '../services/authService';
-import packageJson from '../../../../package.json';
 
 // Composant icône GitHub inline (remplace l'export absent de lucide-react)
 function GithubIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
