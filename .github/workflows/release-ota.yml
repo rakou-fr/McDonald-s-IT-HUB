@@ -27,16 +27,17 @@ jobs:
       - name: Build Web App
         run: npm run build
 
-      - name: Compress dist directory and calculate SHA256 checksum
+      - name: Compress dist directory and calculate SHA256
+        id: prepare_ota
         run: |
           cd dist && zip -r ../dist.zip . && cd ..
-          sha256sum dist.zip | cut -d ' ' -f 1 > dist.zip.sha256
+          HASH=$(sha256sum dist.zip | cut -d ' ' -f 1)
+          echo "CHECKSUM=$HASH" >> $GITHUB_OUTPUT
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            dist.zip
-            dist.zip.sha256
+          body: "SHA256: ${{ steps.prepare_ota.outputs.CHECKSUM }}"
+          files: dist.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

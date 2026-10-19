@@ -21,16 +21,18 @@ export async function checkMobileUpdates() {
     }
 
     const zipAsset = release.assets?.find((asset: any) => asset.name === 'dist.zip');
-    const checksumAsset = release.assets?.find((asset: any) => asset.name === 'dist.zip.sha256');
+    if (!zipAsset) return;
 
-    if (!zipAsset || !checksumAsset) return;
+    // Extraction du SHA256 depuis la description de la release (contourne les blocages CORS)
+    const checksumMatch = release.body?.match(/SHA256:\s*([a-f0-9]{64})/i);
+    const checksum = checksumMatch ? checksumMatch[1] : '';
 
-    // 1. Récupération du hash SHA256 réel depuis GitHub
-    const checksumResponse = await fetch(checksumAsset.browser_download_url);
-    if (!checksumResponse.ok) return;
-    const checksum = (await checksumResponse.text()).trim();
+    if (!checksum) {
+      console.warn("Aucun checksum SHA256 valide trouvé dans la description de la release.");
+      return;
+    }
 
-    // 2. Téléchargement sécurisé avec le vrai checksum
+    // Le plugin natif télécharge dist.zip via Java (contourne le CORS du WebView)
     const downloadedVersion = await CapacitorUpdater.download({
       url: zipAsset.browser_download_url,
       version: latestVersion,
