@@ -1,12 +1,50 @@
 const REPO_OWNER = 'rakou-fr';
 const REPO_NAME = 'IT-McDo';
-const TOKEN = import.meta.env.VITE_GITHUB_TOKEN;
 
-const getHeaders = () => ({
-  'Authorization': `Bearer ${TOKEN}`,
-  'Accept': 'application/vnd.github.v3+json',
-  'Content-Type': 'application/json',
-});
+export const LOCAL_PAT_STORAGE_KEY = 'mcd_github_pat_token';
+
+/**
+ * Récupère le token disponible (Priorité : LocalStorage > Env Variable)
+ */
+export function getActiveToken(): string | null {
+  const localToken = localStorage.getItem(LOCAL_PAT_STORAGE_KEY);
+  if (localToken && localToken.trim() !== '') {
+    return localToken.trim();
+  }
+  const envToken = import.meta.env.VITE_GITHUB_TOKEN;
+  if (envToken && envToken !== 'undefined' && envToken.trim() !== '') {
+    return envToken.trim();
+  }
+  return null;
+}
+
+/**
+ * Sauvegarde la clé PAT saisie par l'utilisateur IT/Admin
+ */
+export function saveLocalPatToken(token: string): void {
+  localStorage.setItem(LOCAL_PAT_STORAGE_KEY, token.trim());
+}
+
+/**
+ * Supprime la clé PAT sauvegardée
+ */
+export function clearLocalPatToken(): void {
+  localStorage.removeItem(LOCAL_PAT_STORAGE_KEY);
+}
+
+const getHeaders = () => {
+  const headers: Record<string, string> = {
+    'Accept': 'application/vnd.github.v3+json',
+    'Content-Type': 'application/json',
+  };
+
+  const token = getActiveToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
+};
 
 // Cache local des SHA pour chaque fichier
 const shaCache: Record<string, string> = {};
@@ -24,12 +62,18 @@ export async function fetchRestaurants(): Promise<Restaurant[]> {
   const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/restaurants.json`;
   try {
     const res = await fetch(url, { headers: getHeaders(), cache: 'no-store' });
-    if (!res.ok) return [{ id: 'default', name: 'Restaurant Principal' }];
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("401_UNAUTHORIZED");
+      }
+      return [{ id: 'default', name: 'Restaurant Principal' }];
+    }
     const data = await res.json();
     shaCache['restaurants.json'] = data.sha;
     const content = decodeURIComponent(escape(atob(data.content)));
     return JSON.parse(content).restaurants || [];
-  } catch {
+  } catch (err: any) {
+    if (err.message === "401_UNAUTHORIZED") throw err;
     return [{ id: 'default', name: 'Restaurant Principal' }];
   }
 }
@@ -46,6 +90,9 @@ export async function saveRestaurants(restaurants: Restaurant[]): Promise<boolea
   if (shaCache['restaurants.json']) body.sha = shaCache['restaurants.json'];
 
   const res = await fetch(url, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(body) });
+  if (!res.ok && (res.status === 401 || res.status === 403)) {
+    throw new Error("401_UNAUTHORIZED");
+  }
   if (res.ok) {
     const data = await res.json();
     shaCache['restaurants.json'] = data.content.sha;
@@ -62,12 +109,18 @@ export async function fetchStockDataForRestaurant(restaurantId: string) {
 
   try {
     const res = await fetch(url, { headers: getHeaders(), cache: 'no-store' });
-    if (!res.ok) return { "Stock arrière": { "Catégories": {} } };
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("401_UNAUTHORIZED");
+      }
+      return { "Stock arrière": { "Catégories": {} } };
+    }
     const data = await res.json();
     shaCache[filePath] = data.sha;
     const content = decodeURIComponent(escape(atob(data.content)));
     return JSON.parse(content);
-  } catch {
+  } catch (err: any) {
+    if (err.message === "401_UNAUTHORIZED") throw err;
     return { "Stock arrière": { "Catégories": {} } };
   }
 }
@@ -76,7 +129,6 @@ export async function pushStockDataForRestaurant(restaurantId: string, state: an
   const filePath = `stocks/${restaurantId}.json`;
   const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${filePath}`;
 
-  // Conversion vers la structure d'origine
   const exportTree: any = { "Stock arrière": { "Catégories": {} } };
   const categoriesTree = exportTree["Stock arrière"]["Catégories"];
 
@@ -111,6 +163,9 @@ export async function pushStockDataForRestaurant(restaurantId: string, state: an
   if (shaCache[filePath]) body.sha = shaCache[filePath];
 
   const res = await fetch(url, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(body) });
+  if (!res.ok && (res.status === 401 || res.status === 403)) {
+    throw new Error("401_UNAUTHORIZED");
+  }
   if (res.ok) {
     const data = await res.json();
     shaCache[filePath] = data.content.sha;
@@ -137,7 +192,7 @@ export async function fetchAllStocksGlobal(restaurants: Restaurant[]) {
           category: item.category,
           subcategory: item.subcategory,
           totalQty: 0,
-          breakdownByRestau: [] // Répartition par restaurant
+          breakdownByRestau: []
         });
       }
       const entry = globalItemsMap.get(key);
@@ -154,9 +209,6 @@ export async function fetchAllStocksGlobal(restaurants: Restaurant[]) {
   return Array.from(globalItemsMap.values());
 }
 
-/**
- * Fonction utilitaire d'origine pour parser la structure JSON en tableau React
- */
 export function parseJsonToState(jsonData: any) {
   const items: any[] = [];
   const categoriesSet = new Map();

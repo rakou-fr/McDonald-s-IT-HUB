@@ -6,29 +6,40 @@ import {
   pushStockDataForRestaurant, 
   fetchAllStocksGlobal, 
   parseJsonToState,
+  saveLocalPatToken,
   type Restaurant
 } from '../services/githubService';
 import { 
   Search, Plus, Save, Loader2, AlertCircle, RefreshCw, Box, 
-  AlertTriangle, CheckCircle, Edit, Trash2, FolderPlus, Building2
+  AlertTriangle, CheckCircle, Edit, Trash2, FolderPlus, Building2, Key, Eye
 } from 'lucide-react';
 
 export function StockItApp() {
+  // Détection du rôle utilisateur depuis le localStorage
+  const storedUser = localStorage.getItem('user');
+  const userRole = storedUser ? (JSON.parse(storedUser).role || '').toLowerCase() : (localStorage.getItem('user_role') || '').toLowerCase();
+  
+  // Seuls 'it' et 'admin' ont le droit d'éditer
+  const canEdit = userRole === 'it' || userRole === 'admin';
+
   // États de chargement et messages
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [isAuthError, setIsAuthError] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Saisie manuelle de la clé PAT GitHub
+  const [isPatModalOpen, setIsPatModalOpen] = useState(false);
+  const [patInput, setPatInput] = useState('');
 
   // Gestion multi-restaurants
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestauId, setSelectedRestauId] = useState<string>('GLOBAL');
 
-  // Données du restaurant sélectionné
+  // Données
   const [categories, setCategories] = useState<{name: string}[]>([]);
   const [items, setItems] = useState<any[]>([]);
-
-  // Données de la vue globale
   const [globalItems, setGlobalItems] = useState<any[]>([]);
 
   // Filtres
@@ -44,22 +55,15 @@ export function StockItApp() {
 
   // Formulaires
   const [itemForm, setItemForm] = useState({
-    category: '',
-    subcategory: '',
-    name: '',
-    qte: 1,
-    status: 'Fonctionnel',
-    note: ''
+    category: '', subcategory: '', name: '', qte: 1, status: 'Fonctionnel', note: ''
   });
   const [catForm, setCatForm] = useState({ name: '' });
   const [newRestauName, setNewRestauName] = useState('');
 
-  // 1. Initialisation : Chargement des restaurants
   useEffect(() => {
     initApp();
   }, []);
 
-  // 2. Rechargement du stock lors du changement de restaurant
   useEffect(() => {
     if (restaurants.length > 0) {
       loadStockForCurrentSelection();
@@ -68,14 +72,21 @@ export function StockItApp() {
 
   const initApp = async () => {
     setLoading(true);
+    setError('');
+    setIsAuthError(false);
     try {
       const restauList = await fetchRestaurants();
       setRestaurants(restauList);
       if (restauList.length > 0) {
         setSelectedRestauId('GLOBAL');
       }
-    } catch (err) {
-      setError("Erreur d'initialisation des restaurants.");
+    } catch (err: any) {
+      if (err.message === "401_UNAUTHORIZED") {
+        setIsAuthError(true);
+        setError("Accès GitHub non autorisé (Clé PAT absente ou expirée).");
+      } else {
+        setError("Erreur d'initialisation des restaurants.");
+      }
     } finally {
       setLoading(false);
     }
@@ -84,6 +95,7 @@ export function StockItApp() {
   const loadStockForCurrentSelection = async () => {
     setLoading(true);
     setError('');
+    setIsAuthError(false);
     try {
       if (selectedRestauId === 'GLOBAL') {
         const globalData = await fetchAllStocksGlobal(restaurants);
@@ -94,17 +106,34 @@ export function StockItApp() {
         setCategories(parsed.categories);
         setItems(parsed.items);
       }
-    } catch (err) {
-      setError("Impossible de charger les données depuis GitHub.");
+    } catch (err: any) {
+      if (err.message === "401_UNAUTHORIZED") {
+        setIsAuthError(true);
+        setError("Accès GitHub non autorisé (401). Une clé PAT est requise.");
+      } else {
+        setError("Impossible de charger les données depuis GitHub.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // --- ACTIONS RESTAURANTS ---
+  // Enregistrement de la clé PAT saisie localement
+  const handleSavePat = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!patInput.trim()) return;
+    saveLocalPatToken(patInput.trim());
+    setIsPatModalOpen(false);
+    setPatInput('');
+    setSuccessMsg("Clé PAT enregistrée en local !");
+    setTimeout(() => setSuccessMsg(''), 3000);
+    initApp();
+  };
+
+  // Actions Restaurants
   const handleCreateRestaurant = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRestauName.trim()) return;
+    if (!canEdit || !newRestauName.trim()) return;
 
     const newId = `restau_${newRestauName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
     const newRestau: Restaurant = { id: newId, name: newRestauName.trim() };
@@ -119,16 +148,17 @@ export function StockItApp() {
       setNewRestauName('');
       setSuccessMsg(`Restaurant "${newRestau.name}" créé avec succès !`);
       setTimeout(() => setSuccessMsg(''), 3000);
-    } catch {
+    } catch (err: any) {
+      if (err.message === "401_UNAUTHORIZED") setIsAuthError(true);
       setError("Erreur lors de la création du restaurant sur GitHub.");
     } finally {
       setSaving(false);
     }
   };
 
-  // --- SAUVEGARDE STOCK ---
+  // Sauvegarde Stock
   const handleSaveStock = async () => {
-    if (selectedRestauId === 'GLOBAL') return;
+    if (!canEdit || selectedRestauId === 'GLOBAL') return;
     setSaving(true);
     setError('');
     setSuccessMsg('');
@@ -136,38 +166,39 @@ export function StockItApp() {
       await pushStockDataForRestaurant(selectedRestauId, { categories, items });
       setSuccessMsg('Stock sauvegardé avec succès sur GitHub !');
       setTimeout(() => setSuccessMsg(''), 3000);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message === "401_UNAUTHORIZED") setIsAuthError(true);
       setError("Erreur lors de la sauvegarde sur GitHub.");
     } finally {
       setSaving(false);
     }
   };
 
-  // --- CRUD ÉQUIPEMENTS ---
+  // CRUD
   const updateItemQty = (id: string, delta: number) => {
+    if (!canEdit) return;
     setItems(items.map(item => item.id === id ? { ...item, qte: Math.max(0, item.qte + delta) } : item));
   };
 
   const openNewItemModal = () => {
+    if (!canEdit) return;
     setEditingItem(null);
     setItemForm({ 
       category: categories.length > 0 ? categories[0].name : '', 
-      subcategory: '', 
-      name: '', 
-      qte: 1, 
-      status: 'Fonctionnel', 
-      note: '' 
+      subcategory: '', name: '', qte: 1, status: 'Fonctionnel', note: '' 
     });
     setIsItemModalOpen(true);
   };
 
   const openEditItemModal = (item: any) => {
+    if (!canEdit) return;
     setEditingItem(item);
     setItemForm({ ...item });
     setIsItemModalOpen(true);
   };
 
   const handleDeleteItem = (id: string) => {
+    if (!canEdit) return;
     if (window.confirm('Voulez-vous vraiment supprimer cet équipement ?')) {
       setItems(items.filter(i => i.id !== id));
     }
@@ -175,10 +206,11 @@ export function StockItApp() {
 
   const handleSaveItem = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEdit) return;
     if (editingItem) {
       setItems(items.map(i => i.id === editingItem.id ? { ...i, ...itemForm } : i));
     } else {
-      const newItem = { ...itemForm, id: "item_" + Math.random().toString(36).substr(2, 9) };
+      const newItem = { ...itemForm, id: "item_" + Math.random().toString(36).substring(2, 9) };
       setItems([...items, newItem]);
     }
     setIsItemModalOpen(false);
@@ -186,6 +218,7 @@ export function StockItApp() {
 
   const handleAddCategory = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEdit) return;
     if (catForm.name.trim() && !categories.some(c => c.name.toLowerCase() === catForm.name.toLowerCase())) {
       setCategories([...categories, { name: catForm.name.trim() }]);
     }
@@ -193,7 +226,7 @@ export function StockItApp() {
     setCatForm({ name: '' });
   };
 
-  // --- FILTRAGE ---
+  // Filtrage
   const isGlobalView = selectedRestauId === 'GLOBAL';
 
   const filteredLocalItems = items.filter(i => {
@@ -224,20 +257,25 @@ export function StockItApp() {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-mcd-green">
         <Loader2 className="animate-spin w-8 h-8 mb-4" />
-        <p className="font-semibold">Chargement des données GitHub...</p>
+        <p className="font-semibold text-sm">Chargement du stock...</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 relative">
-      {/* En-tête avec Sélecteur de Restaurant */}
+      {/* En-tête */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 border border-mcd-border rounded-sm shadow-sm">
         <div>
           <h1 className="text-xl font-bold text-mcd-text flex items-center gap-2">
             <Box className="text-mcd-green" /> STOCK IT
+            {!canEdit && (
+              <span className="text-xs bg-gray-100 text-gray-600 border border-gray-300 font-semibold px-2 py-0.5 rounded flex items-center gap-1">
+                <Eye size={12} /> Mode Lecture
+              </span>
+            )}
           </h1>
-          <p className="text-sm text-mcd-muted mt-0.5">Gestion du matériel par restaurant</p>
+          <p className="text-sm text-mcd-muted mt-0.5">Gestion des équipements du parc informatique</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -257,18 +295,23 @@ export function StockItApp() {
             </select>
           </div>
 
-          <button onClick={() => setIsRestauModalOpen(true)} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-mcd-text font-semibold text-xs border border-mcd-border flex items-center gap-1.5 rounded-sm">
-            <Building2 size={14} /> + Restaurant
-          </button>
-
-          {!isGlobalView && (
+          {/* Boutons réservés aux rôles IT & Admin */}
+          {canEdit && (
             <>
-              <button onClick={() => setIsCatModalOpen(true)} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-mcd-text font-semibold text-xs border border-mcd-border flex items-center gap-1.5 rounded-sm">
-                <FolderPlus size={14} /> + Catégorie
+              <button onClick={() => setIsRestauModalOpen(true)} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-mcd-text font-semibold text-xs border border-mcd-border flex items-center gap-1.5 rounded-sm">
+                <Building2 size={14} /> + Restaurant
               </button>
-              <button onClick={openNewItemModal} className="px-3 py-2 bg-mcd-green hover:bg-[#005135] text-white font-semibold text-xs border border-[#00402a] flex items-center gap-1.5 rounded-sm">
-                <Plus size={14} /> Article
-              </button>
+
+              {!isGlobalView && (
+                <>
+                  <button onClick={() => setIsCatModalOpen(true)} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-mcd-text font-semibold text-xs border border-mcd-border flex items-center gap-1.5 rounded-sm">
+                    <FolderPlus size={14} /> + Catégorie
+                  </button>
+                  <button onClick={openNewItemModal} className="px-3 py-2 bg-mcd-green hover:bg-[#005135] text-white font-semibold text-xs border border-[#00402a] flex items-center gap-1.5 rounded-sm">
+                    <Plus size={14} /> Article
+                  </button>
+                </>
+              )}
             </>
           )}
 
@@ -276,7 +319,7 @@ export function StockItApp() {
             <RefreshCw size={14} />
           </button>
 
-          {!isGlobalView && (
+          {canEdit && !isGlobalView && (
             <button onClick={handleSaveStock} disabled={saving} className="px-4 py-2 bg-mcd-yellow hover:bg-yellow-500 text-black font-bold text-xs border border-yellow-600 flex items-center gap-2 rounded-sm shadow-sm disabled:opacity-70">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Pousser GitHub
@@ -285,11 +328,32 @@ export function StockItApp() {
         </div>
       </div>
 
-      {/* Notifications */}
-      {error && <div className="bg-red-50 text-red-700 p-3 border border-red-200 rounded-sm flex items-center gap-2 text-sm"><AlertCircle size={18} />{error}</div>}
-      {successMsg && <div className="bg-emerald-50 text-mcd-green p-3 border border-emerald-200 rounded-sm flex items-center gap-2 text-sm"><CheckCircle size={18} />{successMsg}</div>}
+      {/* Bandeau d'erreur et Bouton de Saisie de Clé PAT pour IT / Admin */}
+      {error && (
+        <div className="bg-red-50 text-red-700 p-4 border border-red-200 rounded-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <AlertCircle size={18} /> {error}
+            </div>
+              {canEdit && isAuthError && (
+                <button
+                  onClick={() => setIsPatModalOpen(true)}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded shadow flex items-center gap-1.5 transition"
+                >
+                  <Key size={14} /> Configurer Clé PAT GitHub
+                </button>
+              )}
+          </div>
+        </div>
+      )}
 
-      {/* Barre de recherche */}
+      {successMsg && (
+        <div className="bg-emerald-50 text-mcd-green p-3 border border-emerald-200 rounded-sm flex items-center gap-2 text-sm font-medium">
+          <CheckCircle size={18} />{successMsg}
+        </div>
+      )}
+
+      {/* Barre de recherche et filtres */}
       <div className="flex flex-col md:flex-row gap-4 bg-white p-3 border border-mcd-border shadow-sm rounded-sm">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -318,11 +382,9 @@ export function StockItApp() {
         )}
       </div>
 
-      {/* CONTENU PRINCIPAL */}
+      {/* Liste des équipements */}
       {isGlobalView ? (
-        /* VUE GLOBALE CONSOLIDÉE */
         <div className="space-y-4">
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredGlobalItems.map(item => (
               <div key={item.id} className="bg-white border border-mcd-border rounded-sm shadow-sm p-4 space-y-3">
@@ -339,7 +401,6 @@ export function StockItApp() {
                   </div>
                 </div>
 
-                {/* Répartition par restaurant */}
                 <div className="space-y-1.5 pt-1">
                   <p className="text-[10px] font-bold uppercase text-gray-400">Détail par restaurant :</p>
                   {item.breakdownByRestau.map((b: any, idx: number) => (
@@ -354,7 +415,6 @@ export function StockItApp() {
           </div>
         </div>
       ) : (
-        /* VUE SINGLE RESTAURANT */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredLocalItems.map(item => (
             <div key={item.id} className="bg-white border border-mcd-border hover:border-mcd-green transition-colors rounded-sm shadow-sm flex flex-col">
@@ -381,23 +441,66 @@ export function StockItApp() {
               </div>
 
               <div className="p-3 border-t border-mcd-border bg-gray-50 flex items-center justify-between">
-                <div className="flex gap-1">
-                  <button onClick={() => openEditItemModal(item)} className="p-1.5 text-gray-500 hover:text-mcd-green hover:bg-white border border-transparent hover:border-gray-200 rounded transition"><Edit size={14} /></button>
-                  <button onClick={() => handleDeleteItem(item.id)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-white border border-transparent hover:border-gray-200 rounded transition"><Trash2 size={14} /></button>
-                </div>
-                <div className="flex items-center bg-white border border-mcd-border rounded-sm">
-                  <button onClick={() => updateItemQty(item.id, -1)} className="px-2 py-1 text-gray-600 hover:bg-gray-100 font-bold">-</button>
-                  <span className="px-3 text-sm font-black text-mcd-text border-x border-mcd-border">{item.qte}</span>
-                  <button onClick={() => updateItemQty(item.id, 1)} className="px-2 py-1 text-gray-600 hover:bg-gray-100 font-bold">+</button>
-                </div>
+                {canEdit ? (
+                  <>
+                    <div className="flex gap-1">
+                      <button onClick={() => openEditItemModal(item)} className="p-1.5 text-gray-500 hover:text-mcd-green hover:bg-white border border-transparent hover:border-gray-200 rounded transition"><Edit size={14} /></button>
+                      <button onClick={() => handleDeleteItem(item.id)} className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-white border border-transparent hover:border-gray-200 rounded transition"><Trash2 size={14} /></button>
+                    </div>
+                    <div className="flex items-center bg-white border border-mcd-border rounded-sm">
+                      <button onClick={() => updateItemQty(item.id, -1)} className="px-2 py-1 text-gray-600 hover:bg-gray-100 font-bold">-</button>
+                      <span className="px-3 text-sm font-black text-mcd-text border-x border-mcd-border">{item.qte}</span>
+                      <button onClick={() => updateItemQty(item.id, 1)} className="px-2 py-1 text-gray-600 hover:bg-gray-100 font-bold">+</button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full flex justify-end">
+                    <span className="px-3 py-1 text-xs font-bold bg-white border border-mcd-border text-mcd-text rounded-sm">
+                      Quantité : {item.qte}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* MODALE AJOUT RESTAURANT */}
-      {isRestauModalOpen && (
+      {/* MODALE SAISIE CLÉ PAT GITHUB (IT / Admin Uniquement) */}
+      {isPatModalOpen && canEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <form onSubmit={handleSavePat} className="bg-white border-t-4 border-red-600 w-full max-w-md shadow-2xl rounded-sm overflow-hidden">
+            <div className="p-4 border-b border-gray-200 bg-gray-50">
+              <h3 className="font-bold text-base text-mcd-text flex items-center gap-2">
+                <Key className="text-red-600" size={18} /> Configuration Clé PAT GitHub
+              </h3>
+            </div>
+            <div className="p-6 space-y-3">
+              <p className="text-xs text-gray-600 leading-relaxed">
+                Colle ton <strong>Personal Access Token (PAT)</strong> GitHub. Il sera enregistré en local sur cet appareil pour permettre la lecture/écriture des stocks sans recompilation.
+              </p>
+              <div>
+                <label className="text-xs font-bold text-gray-600 uppercase">Jeton GitHub (ghp_...)</label>
+                <input 
+                  type="password" 
+                  required 
+                  value={patInput} 
+                  onChange={e => setPatInput(e.target.value)} 
+                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" 
+                  className="w-full border border-gray-300 bg-gray-50 p-2 mt-1 rounded-sm text-sm outline-none focus:border-red-600 font-mono" 
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t border-gray-200 bg-gray-50">
+              <button type="button" onClick={() => setIsPatModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 font-bold text-sm rounded-sm hover:bg-gray-300 transition">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-red-600 text-white font-bold text-sm rounded-sm hover:bg-red-700 transition">Enregistrer</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODALE RESTAURANT */}
+      {isRestauModalOpen && canEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <form onSubmit={handleCreateRestaurant} className="bg-white border-t-4 border-mcd-green w-full max-w-sm shadow-2xl rounded-sm overflow-hidden">
             <div className="p-4 border-b border-gray-200 bg-gray-50">
@@ -418,7 +521,7 @@ export function StockItApp() {
       )}
 
       {/* MODALE ARTICLE */}
-      {isItemModalOpen && (
+      {isItemModalOpen && canEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <form onSubmit={handleSaveItem} className="bg-white border-t-4 border-mcd-green w-full max-w-lg shadow-2xl rounded-sm overflow-hidden">
             <div className="p-4 border-b border-gray-200 bg-gray-50">
@@ -474,7 +577,7 @@ export function StockItApp() {
       )}
 
       {/* MODALE CATÉGORIE */}
-      {isCatModalOpen && (
+      {isCatModalOpen && canEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <form onSubmit={handleAddCategory} className="bg-white border-t-4 border-mcd-green w-full max-w-sm shadow-2xl rounded-sm overflow-hidden">
             <div className="p-4 border-b border-gray-200 bg-gray-50">
