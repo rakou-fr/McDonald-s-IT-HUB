@@ -15,9 +15,10 @@ import {
 } from 'lucide-react';
 
 export function StockItApp() {
-  // Détection du rôle utilisateur depuis le localStorage
-  const storedUser = localStorage.getItem('user');
-  const userRole = storedUser ? (JSON.parse(storedUser).role || '').toLowerCase() : (localStorage.getItem('user_role') || '').toLowerCase();
+  // Détection du rôle utilisateur (support de 'auth_user' et 'user')
+  const storedUserRaw = localStorage.getItem('auth_user') || localStorage.getItem('user');
+  const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : null;
+  const userRole = (storedUser?.role || localStorage.getItem('user_role') || '').toLowerCase();
   
   // Seuls 'it' et 'admin' ont le droit d'éditer
   const canEdit = userRole === 'it' || userRole === 'admin';
