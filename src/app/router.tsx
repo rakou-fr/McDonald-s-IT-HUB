@@ -3,6 +3,7 @@ import { LoginForm } from '../features/auth/components/LoginForm';
 import { Dashboard } from '../features/dashboard/pages/Dashboard';
 import { AppLayout } from '../components/layout/AppLayout';
 import { StockItApp } from '../features/applications/stock-it/pages/StockItApp';
+import { WikiApp } from '../features/applications/wiki/pages/WikiApp';
 import { ActivityReportApp } from '../features/applications/reports/pages/ActivityReportApp'; // <-- Import de la page
 
 export const router = createBrowserRouter([
@@ -23,8 +24,12 @@ export const router = createBrowserRouter([
         element: <StockItApp />
       },
       {
-        path: 'apps/reports', // <-- Ajout de la nouvelle route
+        path: 'apps/reports',
         element: <ActivityReportApp />
+      },
+      {
+        path: 'apps/wiki',
+        element: <WikiApp />
       }
     ]
   }

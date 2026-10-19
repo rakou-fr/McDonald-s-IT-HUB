@@ -28,5 +28,14 @@ export const applicationsRegistry: HubApp[] = [
     path: '/apps/reports',
     isActive: true,
     category: 'tools'
+  },
+    {
+    id: 'wiki',
+    name: "Wiki IT",
+    description: "Base de connaissances pour la résolution des problèmes techniques.",
+    icon: FileText,
+    path: '/apps/wiki',
+    isActive: true,
+    category: 'tools'
   }
 ];

@@ -125,9 +125,6 @@ export function LoginForm() {
 
       {/* Badge de version et lien GitHub en bas à droite */}
       <div className="fixed bottom-4 right-4 flex items-center gap-2 text-xs bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full border border-mcd-border shadow-sm text-mcd-muted hover:text-mcd-text transition-all">
-        <span className="font-mono text-[11px] font-semibold text-mcd-green bg-green-50 px-1.5 py-0.5 rounded border border-green-200/60">
-          v{packageJson.version}
-        </span>
         <span className="text-gray-300">•</span>
         <a
           href="https://github.com/rakou-fr"
