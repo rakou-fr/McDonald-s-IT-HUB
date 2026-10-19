@@ -27,12 +27,16 @@ jobs:
       - name: Build Web App
         run: npm run build
 
-      - name: Compress dist directory
-        run: cd dist && zip -r ../dist.zip .
+      - name: Compress dist directory and calculate SHA256 checksum
+        run: |
+          cd dist && zip -r ../dist.zip . && cd ..
+          sha256sum dist.zip | cut -d ' ' -f 1 > dist.zip.sha256
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: dist.zip
+          files: |
+            dist.zip
+            dist.zip.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

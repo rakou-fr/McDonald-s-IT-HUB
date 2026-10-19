@@ -21,13 +21,20 @@ export async function checkMobileUpdates() {
     }
 
     const zipAsset = release.assets?.find((asset: any) => asset.name === 'dist.zip');
-    if (!zipAsset) return;
+    const checksumAsset = release.assets?.find((asset: any) => asset.name === 'dist.zip.sha256');
 
-    // Téléchargement du bundle en fournissant le paramètre checksum requis
+    if (!zipAsset || !checksumAsset) return;
+
+    // 1. Récupération du hash SHA256 réel depuis GitHub
+    const checksumResponse = await fetch(checksumAsset.browser_download_url);
+    if (!checksumResponse.ok) return;
+    const checksum = (await checksumResponse.text()).trim();
+
+    // 2. Téléchargement sécurisé avec le vrai checksum
     const downloadedVersion = await CapacitorUpdater.download({
       url: zipAsset.browser_download_url,
       version: latestVersion,
-      checksum: '', // Évite l'erreur "No checksum provided"
+      checksum: checksum,
     });
 
     await CapacitorUpdater.set(downloadedVersion);
