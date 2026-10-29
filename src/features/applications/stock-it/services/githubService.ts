@@ -235,3 +235,94 @@ export function parseJsonToState(jsonData: any) {
   }
   return { categories: Array.from(categoriesSet.values()), items };
 }
+
+
+
+// Todo list 
+export interface TodoItem {
+  id: string;
+  text: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface HistoryEntry {
+  date: string; // Format YYYY-MM-DD
+  validatedBy: string;
+  completedTasks: TodoItem[];
+}
+
+export interface TodoData {
+  todos: TodoItem[];
+  history: HistoryEntry[];
+}
+
+/**
+ * 4. Gestion de la To-Do List (todo.json)
+ */
+export async function fetchTodoData(): Promise<TodoData> {
+  const filePath = 'todo.json';
+  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${filePath}`;
+
+  try {
+    const res = await fetch(url, { headers: getHeaders(), cache: 'no-store' });
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("401_UNAUTHORIZED");
+      }
+      return { todos: [], history: [] };
+    }
+    const data = await res.json();
+    shaCache[filePath] = data.sha;
+    const content = decodeURIComponent(escape(atob(data.content)));
+    return JSON.parse(content);
+  } catch (err: any) {
+    if (err.message === "401_UNAUTHORIZED") throw err;
+    return { todos: [], history: [] };
+  }
+}
+
+export async function pushTodoData(data: TodoData): Promise<boolean> {
+  const filePath = 'todo.json';
+  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${filePath}`;
+
+  const jsonString = JSON.stringify(data, null, 2);
+  const content = btoa(unescape(encodeURIComponent(jsonString)));
+
+  const body: any = {
+    message: 'Mise à jour To-Do List & Historique',
+    content
+  };
+  if (shaCache[filePath]) body.sha = shaCache[filePath];
+
+  const res = await fetch(url, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(body) });
+  if (!res.ok && (res.status === 401 || res.status === 403)) {
+    throw new Error("401_UNAUTHORIZED");
+  }
+  if (res.ok) {
+    const resData = await res.json();
+    shaCache[filePath] = resData.content.sha;
+  }
+  return res.ok;
+}
+
+export type TodoStatus = 'à faire' | 'en cours' | 'fait';
+
+export interface TodoItem {
+  id: string;
+  text: string;
+  status: TodoStatus;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface HistoryEntry {
+  date: string; // Format YYYY-MM-DD
+  validatedBy: string;
+  completedTasks: TodoItem[];
+}
+
+export interface TodoData {
+  todos: TodoItem[];
+  history: HistoryEntry[];
+}

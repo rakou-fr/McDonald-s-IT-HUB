@@ -5,6 +5,10 @@ import hashlib
 import uuid
 from datetime import datetime, timezone
 
+
+rolelist = ["admin", "it", "user", "manager"]
+chartspe = ["$","%","&","/","(",")","=","?","^","*","-","_","+","@","#","<",">",",",".",":",";","!"]
+
 def hash_password(password: str) -> str:
     """Génère un hash sécurisé PBKDF2-SHA256 (600 000 itérations)."""
     salt = os.urandom(16)
@@ -14,7 +18,7 @@ def hash_password(password: str) -> str:
     key_b64 = base64.b64encode(key).decode('utf-8')
     return f"pbkdf2:sha256:{iterations}${salt_b64}${key_b64}"
 
-def add_or_update_user(json_file_path: str, username: str, password_plain: str, role: str = "admin"):
+def add_or_update_user(json_file_path: str, username: str, password_plain: str, role: str):
     try:
         with open(json_file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -22,6 +26,13 @@ def add_or_update_user(json_file_path: str, username: str, password_plain: str, 
         data = {"version": "1.0", "updated_at": "", "users": []}
 
     password_hash = hash_password(password_plain)
+
+    if role not in rolelist:
+        print(f"[ERROR] Le role `{role}` n'est pas valide, choisir parmis : ", rolelist)
+        return
+    if password_plain not in chartspe or len(password_plain) < 8 or not any(c.isupper() for c in password_plain) or not any(c.islower() for c in password_plain) or not any(c.isdigit() for c in password_plain):
+        print(f"[ERROR] Le mot de passe '{password_plain}' ne respecte pas les critères de sécurité.")
+        return
 
     user_found = False
     for user in data["users"]:
@@ -51,4 +62,8 @@ def add_or_update_user(json_file_path: str, username: str, password_plain: str, 
 
 if __name__ == "__main__":
     JSON_PATH = "IT services.json"
-    add_or_update_user(JSON_PATH, "admin", "rootedby", role="admin")
+    print("Liste roles possibles : ", rolelist)
+    if len(rolelist) == 0:
+        print("[ERROR] Aucun rôle défini. Veuillez définir au moins un rôle dans la liste 'rolelist'.")
+    add_or_update_user(JSON_PATH, "ahkbhfkkahk", "rootedby", role="admin")
+    add_or_update_user(JSON_PATH, "Mathieu", "skibidi", role="manager")

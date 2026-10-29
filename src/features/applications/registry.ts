@@ -1,4 +1,4 @@
-import { Box, FileText } from 'lucide-react';
+import { Box, FileText, CheckSquare } from 'lucide-react';
 
 export interface HubApp {
   id: string;
@@ -21,6 +21,15 @@ export const applicationsRegistry: HubApp[] = [
     category: 'tools'
   },
   {
+    id: 'todo-it',
+    name: 'To-Do List IT',
+    description: 'Suivi des tâches journalières et historique d\'archivage des validations.',
+    icon: CheckSquare,
+    path: '/apps/todo',
+    isActive: true,
+    category: 'tools'
+  },
+  {
     id: 'rapport-it',
     name: "Rapports d'Activité IT",
     description: "Générateur de comptes-rendus journaliers d'intervention et export PDF A4.",
@@ -29,7 +38,7 @@ export const applicationsRegistry: HubApp[] = [
     isActive: true,
     category: 'tools'
   },
-    {
+  {
     id: 'wiki',
     name: "Wiki IT",
     description: "Base de connaissances pour la résolution des problèmes techniques.",

@@ -4,7 +4,8 @@ import { Dashboard } from '../features/dashboard/pages/Dashboard';
 import { AppLayout } from '../components/layout/AppLayout';
 import { StockItApp } from '../features/applications/stock-it/pages/StockItApp';
 import { WikiApp } from '../features/applications/wiki/pages/WikiApp';
-import { ActivityReportApp } from '../features/applications/reports/pages/ActivityReportApp'; // <-- Import de la page
+import { ActivityReportApp } from '../features/applications/reports/pages/ActivityReportApp';
+import { TodoApp } from '../features/applications/todo/pages/TodoApp';
 
 export const router = createBrowserRouter([
   {
@@ -30,6 +31,10 @@ export const router = createBrowserRouter([
       {
         path: 'apps/wiki',
         element: <WikiApp />
+      },
+      {
+        path: 'apps/todo',
+        element: <TodoApp />
       }
     ]
   }
